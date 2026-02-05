@@ -39,15 +39,13 @@ int main() {
 
 	// Function below will look into all devices connected to the system and return their size (number).
 	// This fills the 'devices' variable with port names.
-	//DWORD size = QueryDosDevice(NULL, devices, sizeof(devices));
-	DWORD size = 0;
-	std::cout << "Debug started!\n";
+	DWORD size = QueryDosDevice(NULL, devices, sizeof(devices));
+	
 	// If zero, we can output what error occured, useful for debugging.
 	if (size == 0) {
 		std::cout << "Error: " << GetLastError() << std::endl;
 		return 1;
 	}
-	std::cout << "Debug ended!\n";
 	//Stores the address of devices into ptr pointer.
 	wchar_t* ptr = devices;
 
