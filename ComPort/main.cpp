@@ -142,32 +142,41 @@ int main() {
 			std::cout << "Message successfully written!" <<  std::endl;
 		}
 
+		bool comm_error_status;
+		do {
+			comm_error_status = ClearCommError(
+				hfile,
+				&errors,
+				&comStat
+			);
+		} while (!comStat.cbInQue);
 		// 'ClearCommError' it is a windows API that reports Com-port errors and updates COMSTAT structure.
 		/*	Not on COMSTAT Structure:
 		*							This structure contains a stats reporting number of bytes waiting. Without calling
 		*							this function the 'cblnQue' won't get updated.
 		*/
-		bool com_status = ClearCommError(
-			hfile,
-			&errors,
-			&comStat
-		);
+		//bool com_status = ClearCommError(
+		//	hfile,
+		//	&errors,
+		//	&comStat
+		//);
 
 
 		// We executed 'ClearCommError' above once to not only define the 'com_status' but also populating the stats.
 		// It is not the most exquesit way to implement it but it works for now. I will change it in the future.
 		// Below we wait for as long as 'cbInQue' remains zero.
 		// It indicates that there are bytes waiting to be read if it is not zero.
-		while (!comStat.cbInQue) {
-			bool com_status = ClearCommError(
-				hfile,
-				&errors,
-				&comStat
-			);
-		};
+		//while (!comStat.cbInQue) {
+		//	bool com_status = ClearCommError(
+		//		hfile,
+		//		&errors,
+		//		&comStat
+		//	);
+		//};
+
 
 		// If we get zero from the function 'ClearCommError()' it indicates there has been an issue.
-		if (com_status == 0) {
+		if (comm_error_status == 0) {
 			std::cout << "Error: " << GetLastError() << std::endl;
 		}
 		else {// If we succeed we can check how many bytes are there to be read.
