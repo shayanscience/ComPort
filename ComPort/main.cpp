@@ -36,14 +36,35 @@
 ///		Parity = NOPARITY
 /// </summary>
 /// <param name="dcb"></param>
-void serialPortSetup(DCB* dcb) {		/// Function added
+void serialPortSetup(
 	// below we attempt to configure com por configuration.
-	dcb->BaudRate = 9600;
-	dcb->ByteSize = 8;
-	dcb->DCBlength = sizeof(DCB);
-	dcb->StopBits = ONESTOPBIT;
-	dcb->Parity = NOPARITY;
+	DCB* dcb,
+	DWORD baudRate,
+	BYTE byteSize,
+	BYTE parity,
+	BYTE stopBits
+) {
+
+	dcb->BaudRate = baudRate;
+	dcb->ByteSize = byteSize;
+	dcb->Parity = parity;
+	dcb->StopBits = stopBits;
+
 }
+
+// Serial port setup wrapper. Following method enables the user to change the setup default values
+//	as needed. The user can use following function as follow:
+//		serialPortSetup(DCB structure)		or		serialPortSetup(DCB struct, buadrate , byte size, parity, stopbit);
+void serialPortSetup(DCB* dcb) {		/// Function added
+	serialPortSetup(
+		dcb,
+		CBR_9600,
+		8,
+		NOPARITY,
+		ONESTOPBIT
+	);
+}
+
 
 
 int main() {
@@ -54,7 +75,10 @@ int main() {
 	COMSTAT comStat = { 0 };	// COMSTAT is an API structure that is used to check how many bytes are available on the slave device.
 	DWORD errors = 0;			// Used in ClearComStat() function 
 	DWORD bytesRead = 0;		// Used in ReadFile() so that it shows how many bytes have been read by the system.
-	
+	DWORD bytesWritten;			/// Added variable used in write file.
+	DWORD start_time = GetTickCount64();
+	DWORD timeout_limit = 2000;
+	bool time_out = false;
 
 	// Function below will look into all devices connected to the system and return their size (number).
 	// This fills the 'devices' variable with port names.
@@ -101,7 +125,10 @@ int main() {
 			return 1;
 		}
 
-		serialPortSetup(&dcb);
+
+		serialPortSetup(&dcb, 9600, 8, NOPARITY, ONESTOPBIT);
+		//serialPortSetup(&dcb);
+
 
 		// SetCommState will set above values to the port configuration.
 		bool device_control_SetState = SetCommState(hfile, &dcb);
@@ -125,7 +152,7 @@ int main() {
 		// we set read variables. I picked 50ms for interval timeout and timeout constant.
 		timeOut.ReadIntervalTimeout = 50;
 		timeOut.ReadTotalTimeoutMultiplier = 0;
-		timeOut.ReadTotalTimeoutConstant = 0;
+		timeOut.ReadTotalTimeoutConstant = 50;
 
 		// Values above are written into SetCommTimeouts configs.
 		bool comm_timeOut_Setstate = SetCommTimeouts(hfile, &timeOut);
@@ -148,7 +175,7 @@ int main() {
 			hfile,
 			"help\n",
 			5,
-			NULL,
+			&bytesWritten,
 			NULL
 		);
 
@@ -176,7 +203,16 @@ int main() {
 				&errors,
 				&comStat
 			);
+			if (GetTickCount64() - start_time > timeout_limit) {
+				time_out = true;
+				break;
+			}
+			//std::cout << "comm error: " << errors << std::endl;
 		} while (!comStat.cbInQue);
+
+		if (time_out) {
+			std::cout << "Timeout: No response from target!" << std::endl;
+		}
 
 		// If we get zero from the function 'ClearCommError()' it indicates there has been an issue.
 		if (comm_error_status == 0) {
@@ -186,17 +222,18 @@ int main() {
 			std::cout << comStat.cbInQue <<" Bytes waiting to be read!" << std::endl;
 		}
 
-		// If there exist any bytes waiting to be read. We begin to read the information, and store it in 'buffer'.
-		bool read_status = ReadFile(
-			hfile,
-			buffer,
-			sizeof(buffer),
-			&bytesRead,
-			NULL
-		);
 
-		// We need to use null terminator to display the end of the message.
-		buffer[bytesRead] = '\0';
+			// If there exist any bytes waiting to be read. We begin to read the information, and store it in 'buffer'.
+			bool read_status = ReadFile(
+				hfile,
+				buffer,
+				sizeof(buffer),
+				&bytesRead,
+				NULL
+			);
+
+			// We need to use null terminator to display the end of the message.
+			buffer[bytesRead] = '\0';
 
 		// Checking the 'read_status' for debugging purposes.
 		if (read_status == 0) {
