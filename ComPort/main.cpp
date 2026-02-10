@@ -26,12 +26,31 @@
 #include <WinBase.h>
 
 
+/// <summary>
+/// This function receives dcb struct.
+/// This function has default serial port settings.
+///		BuadRate = 9600
+///		ByteSize = 8
+///		DCBlength = sizeof(DCB)
+///		StopBits = ONESTOPBIT
+///		Parity = NOPARITY
+/// </summary>
+/// <param name="dcb"></param>
+void serialPortSetup(DCB* dcb) {		/// Function added
+	// below we attempt to configure com por configuration.
+	dcb->BaudRate = 9600;
+	dcb->ByteSize = 8;
+	dcb->DCBlength = sizeof(DCB);
+	dcb->StopBits = ONESTOPBIT;
+	dcb->Parity = NOPARITY;
+}
+
 
 int main() {
 	wchar_t devices[65535];		// wchar_t (wide character type) 16-bit, has capacity to stor 65535 devices.
 	char buffer[32] = { 0 };	// buffer is used to receive bytes from the other device - can receive up to 32bytes of information.
-	DCB dcb;					// dcb(data control block) is a API structure for configuration of the serial communication. It contains info such as: baudRate, Parity, and etc.
 	COMMTIMEOUTS timeOut;		// API structure to configure the timeout parameters.
+	DCB dcb;					// dcb(data control block) is a API structure for configuration of the serial communication. It contains info such as: baudRate, Parity, and etc.
 	COMSTAT comStat = { 0 };	// COMSTAT is an API structure that is used to check how many bytes are available on the slave device.
 	DWORD errors = 0;			// Used in ClearComStat() function 
 	DWORD bytesRead = 0;		// Used in ReadFile() so that it shows how many bytes have been read by the system.
@@ -79,16 +98,10 @@ int main() {
 
 		if(device_control_Getstate == 0){ // if getting the port configuration failed, output the error value.
 			std::cout << "Error: " << GetLastError() << std::endl;
-		}
-		else { 
 			return 1;
 		}
 
-		// below we attempt to configure com por configuration.
-		dcb.BaudRate = 9600;
-		dcb.ByteSize = 8;
-		dcb.StopBits = 1;
-		dcb.Parity = 0;
+		serialPortSetup(&dcb);
 
 		// SetCommState will set above values to the port configuration.
 		bool device_control_SetState = SetCommState(hfile, &dcb);
@@ -112,7 +125,7 @@ int main() {
 		// we set read variables. I picked 50ms for interval timeout and timeout constant.
 		timeOut.ReadIntervalTimeout = 50;
 		timeOut.ReadTotalTimeoutMultiplier = 0;
-		timeOut.ReadTotalTimeoutConstant = 50;
+		timeOut.ReadTotalTimeoutConstant = 0;
 
 		// Values above are written into SetCommTimeouts configs.
 		bool comm_timeOut_Setstate = SetCommTimeouts(hfile, &timeOut);
@@ -149,6 +162,14 @@ int main() {
 		}
 
 		bool comm_error_status;
+
+		// 'ClearCommError' it is a windows API that reports Com-port errors and updates COMSTAT structure.
+		/*	Note on COMSTAT Structure:
+		*							This structure contains a stats reporting number of bytes waiting. Without calling
+		*							this function the 'cblnQue' won't get updated.
+		*	Below we wait for as long as 'cbInQue' remains zero.
+		*	It indicates that there are bytes waiting to be read if it is not zero.
+		*/
 		do {
 			comm_error_status = ClearCommError(
 				hfile,
@@ -156,7 +177,6 @@ int main() {
 				&comStat
 			);
 		} while (!comStat.cbInQue);
-
 
 		// If we get zero from the function 'ClearCommError()' it indicates there has been an issue.
 		if (comm_error_status == 0) {
