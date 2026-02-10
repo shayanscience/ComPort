@@ -15,7 +15,7 @@
 /*		Data			Release Version				Notes
 * *************************************************************
 *	01/30/2026				1.0.0				Inital Release
-*
+*	01/05/2026				1.0.1				Added more comments for better understanding.
 *
 */
 
@@ -80,49 +80,54 @@ int main() {
 		if(device_control_Getstate == 0){ // if getting the port configuration failed, output the error value.
 			std::cout << "Error: " << GetLastError() << std::endl;
 		}
-		else { // below we attempt to configure com por configuration.
-			dcb.BaudRate = 9600;
-			dcb.ByteSize = 8;
-			dcb.StopBits = 1;
-			dcb.Parity = 0;
-
+		else { 
+			return 1;
 		}
+
+		// below we attempt to configure com por configuration.
+		dcb.BaudRate = 9600;
+		dcb.ByteSize = 8;
+		dcb.StopBits = 1;
+		dcb.Parity = 0;
 
 		// SetCommState will set above values to the port configuration.
 		bool device_control_SetState = SetCommState(hfile, &dcb);
 		if (device_control_SetState == 0) {
 			std::cout << "Error: " << GetLastError() << std::endl;
+			return 1;
 		}
-		else { // Below we attempt to read a few state parameters to confirm above com port configuration.
-			std::cout << "DCB Length: " << dcb.DCBlength << std::endl;
-			std::cout << "BaudRate: " << dcb.BaudRate << std::endl;
-			std::cout << "Parity : " << dcb.Parity << std::endl;
 
-		}
+		// Below we attempt to read a few state parameters to confirm above com port configuration.
+		std::cout << "DCB Length: " << dcb.DCBlength << std::endl;
+		std::cout << "BaudRate: " << dcb.BaudRate << std::endl;
+		std::cout << "Parity : " << dcb.Parity << std::endl;
 
 		// Reading communication timeouts.
 		bool comm_timeOut_Getstate = GetCommTimeouts(hfile, &timeOut);
 		if (comm_timeOut_Getstate ==0) {
 			std::cout << "Error: " << GetLastError() << std::endl;
+			return 1;
 		}
-		else {// we set read variables. I picked 50ms for interval timeout and timeout constant.
-			timeOut.ReadIntervalTimeout = 50;
-			timeOut.ReadTotalTimeoutMultiplier = 0;
-			timeOut.ReadTotalTimeoutConstant = 50;
-		}
+
+		// we set read variables. I picked 50ms for interval timeout and timeout constant.
+		timeOut.ReadIntervalTimeout = 50;
+		timeOut.ReadTotalTimeoutMultiplier = 0;
+		timeOut.ReadTotalTimeoutConstant = 50;
 
 		// Values above are written into SetCommTimeouts configs.
 		bool comm_timeOut_Setstate = SetCommTimeouts(hfile, &timeOut);
 		if (comm_timeOut_Getstate == 0) {
 			std::cout << "Error: " << GetLastError() << std::endl;
+			return 1;
 		}
-		else { // Reading values to confirm they are set properly.
-			std::cout << " " << std::endl;
-			std::cout << "ReadIntervalTimeout: " << timeOut.ReadIntervalTimeout << std::endl;
-			std::cout << "ReadTotalTimeoutMultiplier: " << timeOut.ReadTotalTimeoutMultiplier << std::endl;
-			std::cout << "ReadTotalTimeoutConstant : " << timeOut.ReadTotalTimeoutConstant << std::endl;
-			std::cout << "Time Out Has successfully been set!" << std::endl;
-		}
+
+		// Reading values to confirm they are set properly.
+		std::cout << " " << std::endl;
+		std::cout << "ReadIntervalTimeout: " << timeOut.ReadIntervalTimeout << std::endl;
+		std::cout << "ReadTotalTimeoutMultiplier: " << timeOut.ReadTotalTimeoutMultiplier << std::endl;
+		std::cout << "ReadTotalTimeoutConstant : " << timeOut.ReadTotalTimeoutConstant << std::endl;
+		std::cout << "Time Out Has successfully been set!" << std::endl;
+
 
 		// We attempt to write the message 'help'. It is worthwhile to mention that our target device is set to listent
 		// to 'help' once it receives it, it will respond appropriately.
@@ -137,6 +142,7 @@ int main() {
 		// Below check the return value from 'WriteFile' whether or not the write was successful.
 		if (write_status == 0) {
 			std::cout << "Error: " << GetLastError() << std::endl;
+			return 1;
 		}
 		else {
 			std::cout << "Message successfully written!" <<  std::endl;
@@ -150,29 +156,6 @@ int main() {
 				&comStat
 			);
 		} while (!comStat.cbInQue);
-		// 'ClearCommError' it is a windows API that reports Com-port errors and updates COMSTAT structure.
-		/*	Not on COMSTAT Structure:
-		*							This structure contains a stats reporting number of bytes waiting. Without calling
-		*							this function the 'cblnQue' won't get updated.
-		*/
-		//bool com_status = ClearCommError(
-		//	hfile,
-		//	&errors,
-		//	&comStat
-		//);
-
-
-		// We executed 'ClearCommError' above once to not only define the 'com_status' but also populating the stats.
-		// It is not the most exquesit way to implement it but it works for now. I will change it in the future.
-		// Below we wait for as long as 'cbInQue' remains zero.
-		// It indicates that there are bytes waiting to be read if it is not zero.
-		//while (!comStat.cbInQue) {
-		//	bool com_status = ClearCommError(
-		//		hfile,
-		//		&errors,
-		//		&comStat
-		//	);
-		//};
 
 
 		// If we get zero from the function 'ClearCommError()' it indicates there has been an issue.
