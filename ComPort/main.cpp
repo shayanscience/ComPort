@@ -143,7 +143,9 @@ int main() {
 			std::cout << "Error: " << GetLastError() << std::endl;
 			return 1;
 		}
-
+		//Data Terminal Ready. This enables the feature on arduino to reset itself.
+		dcb.fDtrControl = DTR_CONTROL_ENABLE;
+		dcb.fRtsControl = RTS_CONTROL_ENABLE;
 
 		serialPortSetup(&dcb, 9600, 8, NOPARITY, ONESTOPBIT);
 		//serialPortSetup(&dcb);
