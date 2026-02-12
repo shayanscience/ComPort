@@ -16,7 +16,7 @@
 * *************************************************************
 *	01/30/2026				1.0.0				Inital Release
 *	01/05/2026				1.0.1				Added more comments for better understanding.
-*
+*	01/10/2026				1.1.0				Added new functions. 
 */
 
 #include <iostream>
@@ -25,6 +25,7 @@
 #include <fileapi.h>
 #include <WinBase.h>
 
+#define buffer_size  32
 
 /// <summary>
 /// This function receives dcb struct.
@@ -49,6 +50,10 @@ void serialPortSetup(
 	dcb->Parity = parity;
 	dcb->StopBits = stopBits;
 
+	//Data Terminal Ready. This enables the feature on arduino to reset itself.
+	dcb->fDtrControl = DTR_CONTROL_ENABLE;
+	dcb->fRtsControl = RTS_CONTROL_ENABLE;
+
 }
 
 // Serial port setup wrapper. Following method enables the user to change the setup default values
@@ -66,10 +71,10 @@ void serialPortSetup(DCB* dcb) {		/// Function added
 
 
 /// <summary>
-/// write_message(HANDLE hfile, std::string& msg, DWORD* bytesWritten) 
-/// hfile -> File handler for the created file. Appropriate COMPORT is assigned in this handler.
-/// msg	  -> Takes user input.
-/// bytesWritten	-> Populates the number of bytes written in 'bytesWritten'.
+/// write_message(HANDLE hfile,std::string& msg,DWORD* bytesWritten)
+/// hfile file handler for the createFile(...). Appropriate COMPORT is assigned in this handler.
+/// msg takes user input.
+/// bytesWritten Populates the number of bytes written in 'bytesWritten'.
 /// </summary>
 /// <param name="hfile"></param>
 /// <param name="msg"></param>
@@ -85,19 +90,31 @@ bool write_message(HANDLE hfile, std::string& msg, DWORD* bytesWritten) {
 	);
 }
 
+bool read_message(HANDLE hfile, char* buffer, uint8_t bufferSize, DWORD* bytesRead) {
+	return ReadFile(
+		hfile,
+		buffer,
+		bufferSize,
+		bytesRead,
+		NULL
+	);
+}
+
 int main() {
-	wchar_t devices[65535];		// wchar_t (wide character type) 16-bit, has capacity to stor 65535 devices.
-	char read_buffer[32] = { 0 };	// buffer is used to receive bytes from the other device - can receive up to 32bytes of information.
-	COMMTIMEOUTS timeOut;		// API structure to configure the timeout parameters.
-	DCB dcb;					// dcb(data control block) is a API structure for configuration of the serial communication. It contains info such as: baudRate, Parity, and etc.
-	COMSTAT comStat = { 0 };	// COMSTAT is an API structure that is used to check how many bytes are available on the slave device.
-	DWORD errors = 0;			// Used in ClearComStat() function 
-	DWORD bytesRead = 0;		// Used in ReadFile() so that it shows how many bytes have been read by the system.
-	DWORD bytesWritten;			// This variabl stores number of bytes written to the target by the host.
+	
+	wchar_t devices[65535];			// wchar_t (wide character type) 16-bit, has capacity to stor 65535 devices.
+	char read_buffer[buffer_size] = { 0 };	// buffer is used to receive bytes from the other device - can receive up to 32bytes of information.
+	std::string write_buffer;		// Stores user input.
+	COMMTIMEOUTS timeOut;			// API structure to configure the timeout parameters.
+	DCB dcb;						// dcb(data control block) is a API structure for configuration of the serial communication. It contains info such as: baudRate, Parity, and etc.
+	COMSTAT comStat = { 0 };		// COMSTAT is an API structure that is used to check how many bytes are available on the slave device.
+	DWORD errors = 0;				// Used in ClearComStat() function 
+	DWORD bytesRead = 0;			// Used in ReadFile() so that it shows how many bytes have been read by the system.
+	DWORD bytesWritten;				// This variabl stores number of bytes written to the target by the host.
 	DWORD start_time = GetTickCount64();	// Getting current tick.
 	DWORD timeout_limit = 2000;				// Conditional variable
 	bool time_out = false;					// Time out flag.
-	std::string write_buffer;				// Stores user input.
+
 
 	// Function below will look into all devices connected to the system and return their size (number).
 	// This fills the 'devices' variable with port names.
@@ -122,7 +139,7 @@ int main() {
 	// Create a file handle with the given field such as: only read/write or both, and etc. for a specific port
 	//	and for this case is for 'COM7'.
 	HANDLE hfile = CreateFileA(
-		"COM7",
+		"\\\\.\\COM7",
 		(GENERIC_READ | GENERIC_WRITE),
 		0,
 		NULL,
@@ -133,7 +150,8 @@ int main() {
 
 	// Check if file creation succeeded
 	if (hfile == INVALID_HANDLE_VALUE) {
-		std::cout << " Could not open the COM port";
+		std::cout << " Could not open the COM port" << std::endl;
+		std::cout << "Error: " << GetLastError() << std::endl;
 	}// if successful get default communication states (baudrate, size, parity, etc.).
 	else {
 		std::cout << "COM port is opened" << std::endl;
@@ -143,11 +161,9 @@ int main() {
 			std::cout << "Error: " << GetLastError() << std::endl;
 			return 1;
 		}
-		//Data Terminal Ready. This enables the feature on arduino to reset itself.
-		dcb.fDtrControl = DTR_CONTROL_ENABLE;
-		dcb.fRtsControl = RTS_CONTROL_ENABLE;
 
-		serialPortSetup(&dcb, 9600, 8, NOPARITY, ONESTOPBIT);
+
+		serialPortSetup(&dcb, CBR_115200, 8, NOPARITY, ONESTOPBIT);
 		//serialPortSetup(&dcb);
 		/// Commented function above is used for testing 
 
@@ -195,6 +211,11 @@ int main() {
 		//	stands for quit, then the process will end and the system closes the port.
 		while(true){
 			std::cin >> write_buffer;
+			//start_time = GetTickCount64();	// Getting current tick.
+			//time_out = false;
+			//write_buffer += "\r\n"; // Most devices expect CR+LF to "execute" a command
+			// This clears the Windows internal buffers for this port
+			//PurgeComm(hfile, PURGE_RXCLEAR | PURGE_TXCLEAR);
 			// We attempt to write the message 'help'. It is worthwhile to mention that our target device is set to listent
 			// to 'help' once it receives it, it will respond appropriately.
 			bool write_status = write_message(hfile, write_buffer, &bytesWritten);
@@ -217,20 +238,17 @@ int main() {
 			*	It indicates that there are bytes waiting to be read if it is not zero.
 			*/
 			do {
-				comm_error_status = ClearCommError(
-					hfile,
-					&errors,
-					&comStat
-				);
+				comm_error_status = ClearCommError(hfile, &errors, &comStat);
 				if (GetTickCount64() - start_time > timeout_limit) {
 					time_out = true;
 					break;
 				}
 				//std::cout << "comm error: " << errors << std::endl;
-			} while (!comStat.cbInQue);
+			} while (comStat.cbInQue==0);
 
 			if (time_out) {
 				std::cout << "Timeout: No response from target!" << std::endl;
+				//continue;
 			}
 
 			// If we get zero from the function 'ClearCommError()' it indicates there has been an issue.
@@ -243,13 +261,7 @@ int main() {
 
 
 			// If there exist any bytes waiting to be read. We begin to read the information, and store it in 'buffer'.
-			bool read_status = ReadFile(
-				hfile,
-				read_buffer,
-				sizeof(read_buffer),
-				&bytesRead,
-				NULL
-			);
+			bool read_status = read_message(hfile, read_buffer, buffer_size, &bytesRead);
 
 			// We need to use null terminator to display the end of the message.
 			read_buffer[bytesRead] = '\0';
